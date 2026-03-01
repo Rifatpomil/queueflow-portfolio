@@ -1,0 +1,176 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# QueueFlow – local development stack
+#   docker compose up --build
+# ──────────────────────────────────────────────────────────────────────────────
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── PostgreSQL ───────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-queueflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-queueflow_dev_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-queueflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-queueflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *default-logging
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
+
+  # ── Keycloak (SSO) ───────────────────────────────────────────────────────────
+  keycloak:
+    image: quay.io/keycloak/keycloak:23.0
+    restart: unless-stopped
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: dev-mem
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    logging: *default-logging
+
+  # ── API (FastAPI) ────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    restart: unless-stopped
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-queueflow}:${POSTGRES_PASSWORD:-queueflow_dev_secret}@db:5432/${POSTGRES_DB:-queueflow}
+      DATABASE_SYNC_URL: postgresql+psycopg2://${POSTGRES_USER:-queueflow}:${POSTGRES_PASSWORD:-queueflow_dev_secret}@db:5432/${POSTGRES_DB:-queueflow}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-super-secret-key-change-in-prod-32chars}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRE_MINUTES: 60
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: queueflow
+      KEYCLOAK_CLIENT_ID: queueflow-api
+      AUTH_MODE: dev   # "dev" | "keycloak"
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173","http://localhost"]'
+      LOG_LEVEL: INFO
+      RATE_LIMIT_ENABLED: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+
+  # ── Celery Worker ────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4 -Q default,analytics
+    environment:
+      APP_ENV: development
+      DATABASE_SYNC_URL: postgresql+psycopg2://${POSTGRES_USER:-queueflow}:${POSTGRES_PASSWORD:-queueflow_dev_secret}@db:5432/${POSTGRES_DB:-queueflow}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-super-secret-key-change-in-prod-32chars}
+      LOG_LEVEL: INFO
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ── Celery Beat (scheduler) ───────────────────────────────────────────────────
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    restart: unless-stopped
+    command: celery -A app.workers.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    environment:
+      APP_ENV: development
+      DATABASE_SYNC_URL: postgresql+psycopg2://${POSTGRES_USER:-queueflow}:${POSTGRES_PASSWORD:-queueflow_dev_secret}@db:5432/${POSTGRES_DB:-queueflow}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      LOG_LEVEL: INFO
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+
+  # ── Frontend (React/Vite → Nginx) ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    logging: *default-logging
+
+volumes:
+  postgres_data:
+  redis_data:
