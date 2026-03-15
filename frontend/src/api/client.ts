@@ -117,3 +117,47 @@ export const analyticsApi = {
   summary: (locationId: string, from: string, to: string) =>
     api.get<KPISummary>(`/v1/analytics/location/${locationId}/summary?from=${from}&to=${to}`),
 };
+
+// ── AI ───────────────────────────────────────────────────────────────────────
+export interface ServiceSuggestion {
+  suggested_service_id: string | null;
+  suggested_service_name: string | null;
+  confidence: number;
+}
+
+export interface WaitPrediction {
+  predicted_wait_minutes: number;
+  waiting_count: number;
+  confidence: number;
+}
+
+export interface AIInsights {
+  insights: string[];
+  kpi: KPISummary & Record<string, unknown>;
+  summary: string;
+}
+
+export const aiApi = {
+  suggestService: (tenantId: string, locationId: string, query: string) =>
+    api.post<ServiceSuggestion>(
+      "/v1/ai/suggest-service",
+      { tenant_id: tenantId, location_id: locationId, query }
+    ),
+  kioskSuggestService: (locationId: string, query: string) =>
+    api.post<ServiceSuggestion>("/v1/ai/kiosk/suggest-service", {
+      location_id: locationId,
+      query,
+    }),
+  predictWait: (locationId: string) =>
+    api.get<WaitPrediction>(`/v1/ai/predict-wait?location_id=${locationId}`),
+  insights: (locationId: string, from: string, to: string) =>
+    api.get<AIInsights>(`/v1/ai/insights/${locationId}?from=${from}&to=${to}`),
+};
+
+// ── Kiosk (public, no auth) ───────────────────────────────────────────────────
+export const kioskApi = {
+  createTicket: (body: { location_id: string; service_id: string }, idempotencyKey: string) =>
+    api.post<Ticket>("/v1/kiosk/tickets", body, {
+      "Idempotency-Key": idempotencyKey,
+    }),
+};
