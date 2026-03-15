@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     # ── RLS (Postgres Row-Level Security) ──────────────────────────────────────
     rls_enabled: bool = False
 
+    # ── AI (Groq free tier / OpenAI-compatible) ──────────────────────────────────
+    ai_api_key: str = ""
+    ai_provider: Literal["groq", "openai", "mock"] = "mock"
+    ai_base_url: str = ""  # For OpenAI-compatible custom endpoints
+
     # ── Derived helpers ───────────────────────────────────────────────────────
     @property
     def is_dev(self) -> bool:
