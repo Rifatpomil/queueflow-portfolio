@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { adminApi, analyticsApi } from "../api/client";
+import { adminApi, analyticsApi, aiApi } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import type { Location, Counter, Service, KPISummary } from "../types";
 
@@ -12,6 +12,7 @@ export function AdminPanel() {
   const [counters, setCounters] = useState<Counter[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [kpi, setKpi] = useState<KPISummary | null>(null);
+  const [aiInsights, setAiInsights] = useState<{ insights: string[]; summary: string } | null>(null);
   const [tab, setTab] = useState<"overview" | "locations" | "services" | "counters">("overview");
 
   const tenantId = user?.tenant_id || DEMO_TENANT_ID;
@@ -32,6 +33,9 @@ export function AdminPanel() {
     analyticsApi.summary(DEMO_LOCATION_ID, from, to)
       .then(setKpi)
       .catch(() => {});
+    aiApi.insights(DEMO_LOCATION_ID, from, to)
+      .then((r) => setAiInsights({ insights: r.insights, summary: r.summary }))
+      .catch(() => {});
   }, [tenantId]);
 
   if (!hasRole("admin", "manager")) {
@@ -50,6 +54,20 @@ export function AdminPanel() {
           Tenant: {tenantId}
         </p>
       </div>
+
+      {/* AI Insights */}
+      {aiInsights && (
+        <div className="card" style={{ borderLeft: "4px solid var(--primary)" }}>
+          <h3 style={{ marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span className="ai-badge">AI</span> Insights
+          </h3>
+          <ul style={{ margin: 0, paddingLeft: "20px", color: "var(--text-muted)", fontSize: "0.9rem", lineHeight: 1.8 }}>
+            {aiInsights.insights.map((insight, i) => (
+              <li key={i}>{insight}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* KPI Summary */}
       {kpi && (

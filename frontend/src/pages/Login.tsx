@@ -31,26 +31,18 @@ export function Login() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-      }}
-    >
-      <div className="card" style={{ width: "100%", maxWidth: "400px" }}>
-        <h1 style={{ marginBottom: "8px", color: "var(--primary)" }}>QueueFlow</h1>
-        <p style={{ color: "var(--text-muted)", marginBottom: "24px", fontSize: "0.9rem" }}>
-          Multi-site Queue Orchestration Platform
+    <div className="login-page">
+      <div className="login-card">
+        <h1 className="login-title">
+          <span className="login-logo">◆</span> QueueFlow
+        </h1>
+        <p className="login-subtitle">
+          AI-powered Queue Orchestration Platform
         </p>
 
-        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+        <form onSubmit={handleLogin} className="login-form">
           <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "0.875rem" }}>
-              DEV User
-            </label>
+            <label className="login-label">DEV User</label>
             <select value={email} onChange={(e) => setEmail(e.target.value)}>
               {DEV_USERS.map((u) => (
                 <option key={u.email} value={u.email}>
@@ -59,15 +51,14 @@ export function Login() {
               ))}
             </select>
           </div>
-          {error && <div style={{ color: "var(--danger)", fontSize: "0.875rem" }}>{error}</div>}
-          <button type="submit" className="btn-primary" disabled={loading}>
+          {error && <div className="login-error">{error}</div>}
+          <button type="submit" className="btn-primary login-btn" disabled={loading}>
             {loading ? "Signing in…" : "Sign in (DEV mode)"}
           </button>
         </form>
 
-        <div style={{ marginTop: "16px", padding: "12px", background: "var(--surface-2)", borderRadius: "var(--radius)", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-          <strong>DEV mode:</strong> No password required. Select a role and sign in.
-          For Signage display: <code>/signage/&lt;location_id&gt;</code> (no auth).
+        <div className="login-dev-note">
+          <strong>DEV mode:</strong> No password required. Kiosk: <a href="/kiosk">/kiosk</a> · Signage: <a href="/signage/00000000-0000-0000-0000-000000000020">/signage</a>
         </div>
       </div>
     </div>
