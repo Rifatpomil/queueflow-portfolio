@@ -27,6 +27,10 @@ export function Navbar() {
         </span>
         <Link to="/">Queue</Link>
         <Link to="/admin">Admin</Link>
+        <a href={`/kiosk/${"00000000-0000-0000-0000-000000000020"}`} target="_blank" rel="noreferrer">
+          Kiosk
+        </a>
+        <a href="/kiosk" target="_blank" rel="noreferrer">Kiosk</a>
       </div>
       {user && (
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>

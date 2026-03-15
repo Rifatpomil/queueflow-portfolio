@@ -4,6 +4,7 @@ import { Login } from "./pages/Login";
 import { OperatorQueue } from "./pages/OperatorQueue";
 import { SignageDisplay } from "./pages/SignageDisplay";
 import { AdminPanel } from "./pages/AdminPanel";
+import { Kiosk } from "./pages/Kiosk";
 import { useAuth } from "./hooks/useAuth";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -17,8 +18,10 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        {/* Public signage – no auth */}
+        {/* Public – no auth */}
         <Route path="/signage/:locationId" element={<SignageDisplay />} />
+        <Route path="/kiosk/:locationId" element={<Kiosk />} />
+        <Route path="/kiosk" element={<Navigate to="/kiosk/00000000-0000-0000-0000-000000000020" replace />} />
         {/* Protected routes */}
         <Route
           path="/"
